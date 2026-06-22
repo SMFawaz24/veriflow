@@ -1,0 +1,25 @@
+{
+  "name": "veriflow",
+  "version": "2.1.0",
+  "description": "Veriflow — Data pipeline, validation, and transformation server",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev":   "nodemon server.js"
+  },
+  "dependencies": {
+    "cors":           "^2.8.5",
+    "csv-parse":      "^5.5.6",
+    "csv-stringify":  "^6.4.6",
+    "dotenv":         "^16.4.5",
+    "express":        "^4.18.2",
+    "multer":         "^1.4.5-lts.1"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.3"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "license": "MIT"
+}

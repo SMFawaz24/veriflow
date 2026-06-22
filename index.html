@@ -1,0 +1,1065 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Veriflow — Data Pipeline</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.11.0/dist/tabler-icons.min.css"/>
+<style>
+:root{
+  --bg:#08090c;--s1:#0f1117;--s2:#141720;--s3:#1a1e2a;
+  --b1:#1e2332;--b2:#252d42;--b3:#2e3852;
+  --accent:#3b82f6;--accent-d:#1d4ed8;--accent-t:rgba(59,130,246,.12);
+  --green:#10b981;--green-t:rgba(16,185,129,.1);
+  --red:#ef4444;--red-t:rgba(239,68,68,.1);
+  --amber:#f59e0b;--amber-t:rgba(245,158,11,.1);
+  --purple:#a78bfa;--purple-t:rgba(167,139,250,.1);
+  --text:#e2e8f0;--text2:#94a3b8;--text3:#4b5875;--text4:#2d3a52;
+  --mono:'IBM Plex Mono',monospace;--sans:'Inter',system-ui,sans-serif;
+  --r:8px;--r2:12px;--r3:16px;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:14px;line-height:1.6;min-height:100vh}
+
+/* ── LAYOUT ── */
+.page{max-width:1120px;margin:0 auto;padding:0 28px 100px}
+
+/* ── HEADER ── */
+.header{display:flex;align-items:center;justify-content:space-between;padding:28px 0 24px;border-bottom:1px solid var(--b1);margin-bottom:44px}
+.brand{display:flex;align-items:center;gap:16px}
+.brand-mark{
+  width:32px;height:32px;
+  background:var(--accent);
+  border-radius:6px;
+  display:grid;place-items:center;
+  flex-shrink:0;
+  position:relative;
+  overflow:hidden;
+}
+.brand-mark::before{
+  content:'';
+  position:absolute;
+  inset:0;
+  background:linear-gradient(135deg,rgba(255,255,255,.15) 0%,transparent 60%);
+}
+.brand-mark svg{position:relative;z-index:1}
+.brand-text{}
+.brand-name{
+  font-size:15px;font-weight:600;letter-spacing:-.3px;
+  color:var(--text);line-height:1.2;
+}
+.brand-name em{font-style:normal;color:var(--accent)}
+.brand-sub{font-size:11px;color:var(--text3);letter-spacing:.01em;margin-top:1px}
+.header-right{display:flex;align-items:center;gap:12px}
+.header-status{display:flex;align-items:center;gap:6px;font-family:var(--mono);font-size:11px;color:var(--text3)}
+.health-dot{width:6px;height:6px;border-radius:50%;background:var(--text4);transition:background .3s;flex-shrink:0}
+.health-dot.ok{background:var(--green)}
+.health-dot.err{background:var(--red)}
+.header-divider{width:1px;height:16px;background:var(--b2)}
+.header-version{font-family:var(--mono);font-size:11px;color:var(--text4);letter-spacing:.04em}
+
+/* ── SECTION LABEL ── */
+.slabel{font-family:var(--mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--text3);display:flex;align-items:center;gap:10px;margin-bottom:14px;user-select:none}
+.slabel::after{content:'';flex:1;height:1px;background:var(--b1)}
+
+/* ── UPLOAD ── */
+.upload-zone{border:1px dashed var(--b3);border-radius:var(--r3);background:var(--s1);padding:56px 32px;text-align:center;cursor:pointer;transition:border-color .18s,background .18s;position:relative}
+.upload-zone:hover,.upload-zone.drag{border-color:var(--accent);background:var(--s2);border-style:solid}
+.upload-zone.loaded{border-style:solid;border-color:var(--green);background:var(--green-t)}
+.upload-zone input{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
+.uz-icon{width:48px;height:48px;background:var(--s2);border:1px solid var(--b2);border-radius:10px;display:grid;place-items:center;margin:0 auto 16px;color:var(--text3);font-size:20px;transition:all .18s}
+.upload-zone:hover .uz-icon,.upload-zone.drag .uz-icon{color:var(--accent);background:var(--accent-t);border-color:var(--accent)}
+.upload-zone.loaded .uz-icon{color:var(--green);background:var(--green-t);border-color:var(--green)}
+.uz-title{font-size:15px;font-weight:500;margin-bottom:5px}
+.uz-sub{font-size:13px;color:var(--text2)}
+.uz-sub span{color:var(--accent);font-weight:500}
+
+/* ── PROGRESS ── */
+.prog-wrap{display:none;margin-top:16px;background:var(--s2);border:1px solid var(--b1);border-radius:var(--r);padding:13px 16px}
+.prog-wrap.on{display:block}
+.prog-top{font-size:12px;color:var(--text2);margin-bottom:8px;display:flex;justify-content:space-between}
+.prog-bar{height:3px;background:var(--b2);border-radius:2px;overflow:hidden}
+.prog-fill{height:100%;background:var(--accent);border-radius:2px;width:0;transition:width .12s}
+
+/* ── QUALITY SCORE ── */
+.quality-wrap{display:none;margin-top:16px}
+.quality-wrap.on{display:flex;align-items:stretch;gap:10px}
+.quality-score{background:var(--s1);border:1px solid var(--b1);border-radius:var(--r);padding:16px 20px;display:flex;align-items:center;gap:16px;min-width:200px}
+.qs-ring{position:relative;width:56px;height:56px;flex-shrink:0}
+.qs-ring svg{transform:rotate(-90deg)}
+.qs-ring circle{fill:none;stroke-width:5;stroke-linecap:round}
+.qs-track{stroke:var(--b2)}
+.qs-fill{stroke:var(--green);transition:stroke-dashoffset .6s ease,stroke .4s}
+.qs-num{position:absolute;inset:0;display:grid;place-items:center;font-family:var(--mono);font-size:14px;font-weight:500}
+.qs-info{flex:1}
+.qs-label{font-size:13px;font-weight:500;margin-bottom:2px}
+.qs-sub{font-size:12px;color:var(--text2)}
+.quality-breakdown{flex:1;background:var(--s1);border:1px solid var(--b1);border-radius:var(--r);padding:14px 16px;display:grid;grid-template-columns:1fr 1fr;gap:8px 20px}
+.qb-item{display:flex;align-items:center;justify-content:space-between;font-size:12px}
+.qb-label{color:var(--text2)}
+.qb-val{font-family:var(--mono);font-weight:500}
+
+/* ── META CARDS ── */
+.meta-grid{display:none;grid-template-columns:repeat(auto-fill,minmax(145px,1fr));gap:10px;margin-top:16px}
+.meta-grid.on{display:grid}
+.meta-card{background:var(--s1);border:1px solid var(--b1);border-radius:var(--r);padding:12px 14px}
+.meta-lbl{font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--text3);margin-bottom:4px}
+.meta-val{font-size:14px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* ── TABLE ── */
+.tscroll{overflow-x:auto;border:1px solid var(--b1);border-radius:var(--r2);background:var(--s1)}
+table{border-collapse:collapse;width:100%;min-width:500px}
+thead{position:sticky;top:0;z-index:1}
+th{background:var(--s2);padding:9px 14px;text-align:left;font-family:var(--mono);font-size:11px;font-weight:500;color:var(--text2);letter-spacing:.06em;text-transform:uppercase;border-bottom:1px solid var(--b2);white-space:nowrap}
+td{padding:8px 14px;border-bottom:1px solid var(--b1);font-family:var(--mono);font-size:12px;color:var(--text);max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:var(--s2)}
+td.cn{color:var(--red);font-style:italic}
+td.cm{color:#7dd3fc}
+
+/* ── PREVIEW ── */
+.preview{display:none;margin-top:22px}
+.preview.on{display:block}
+
+/* ── SCHEMA PANEL ── */
+.schema-section{display:none;margin-top:22px}
+.schema-section.on{display:block}
+.schema-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:10px}
+.sc-card{background:var(--s1);border:1px solid var(--b1);border-radius:var(--r);padding:14px;transition:border-color .14s}
+.sc-card:hover{border-color:var(--b3)}
+.sc-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+.sc-name{font-family:var(--mono);font-size:12px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:150px}
+.sc-type{font-family:var(--mono);font-size:10px;padding:2px 8px;border-radius:4px;font-weight:500;white-space:nowrap}
+.type-numeric{background:rgba(59,130,246,.15);color:var(--accent)}
+.type-text{background:rgba(167,139,250,.15);color:var(--purple)}
+.type-datetime{background:rgba(16,185,129,.15);color:var(--green)}
+.type-boolean{background:rgba(245,158,11,.15);color:var(--amber)}
+.type-email{background:rgba(239,68,68,.12);color:var(--red)}
+.sc-null-bar{height:3px;background:var(--b2);border-radius:2px;margin-bottom:10px;overflow:hidden}
+.sc-null-fill{height:100%;border-radius:2px;background:var(--green)}
+.sc-null-fill.warn{background:var(--amber)}
+.sc-null-fill.bad{background:var(--red)}
+.sc-rows{display:flex;flex-direction:column;gap:3px}
+.sc-row{display:flex;justify-content:space-between;font-size:11px;padding:2px 0}
+.sc-row-k{color:var(--text3)}
+.sc-row-v{font-family:var(--mono);color:var(--text2);text-align:right;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sc-top{margin-top:8px;border-top:1px solid var(--b1);padding-top:8px}
+.sc-top-title{font-size:10px;color:var(--text4);font-family:var(--mono);text-transform:uppercase;letter-spacing:.08em;margin-bottom:5px}
+.sc-top-item{display:flex;align-items:center;gap:6px;font-size:11px;padding:1px 0}
+.sc-bar-wrap{flex:1;height:3px;background:var(--b2);border-radius:2px;overflow:hidden}
+.sc-bar{height:100%;background:var(--accent);border-radius:2px}
+.sc-top-val{font-family:var(--mono);color:var(--text3);font-size:10px;min-width:28px;text-align:right}
+.sc-top-lbl{color:var(--text2);max-width:80px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* ── PIPELINE ── */
+.pipeline{display:none;margin-top:44px}
+.pipeline.on{display:block}
+.panel{border:1px solid var(--b1);border-radius:var(--r2);margin-bottom:10px;overflow:hidden;background:var(--s1)}
+.phdr{display:flex;align-items:center;justify-content:space-between;padding:15px 18px;cursor:pointer;user-select:none;border-bottom:1px solid transparent;transition:background .14s}
+.phdr:hover{background:var(--s2)}
+.phdr.open{border-bottom-color:var(--b1)}
+.ptitle{display:flex;align-items:center;gap:12px;font-weight:500;font-size:14px}
+.pbadge{width:28px;height:28px;border-radius:7px;display:grid;place-items:center;font-size:15px;flex-shrink:0}
+.pb-blue{background:rgba(59,130,246,.12);color:var(--accent)}
+.pb-green{background:rgba(16,185,129,.12);color:var(--green)}
+.pb-purple{background:rgba(139,92,246,.12);color:var(--purple)}
+.pb-amber{background:rgba(245,158,11,.12);color:var(--amber)}
+.pb-red{background:rgba(239,68,68,.12);color:var(--red)}
+.pchev{color:var(--text3);font-size:14px;transition:transform .2s}
+.phdr.open .pchev{transform:rotate(180deg)}
+.pbody{display:none;padding:18px}
+.pbody.open{display:block}
+
+/* ── OPTIONS ── */
+.opt-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:8px}
+.opt{display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--s2);border:1px solid var(--b1);border-radius:var(--r);cursor:pointer;transition:border-color .14s,background .14s}
+.opt:hover{border-color:var(--b3)}
+.opt.active{border-color:var(--accent);background:var(--accent-t)}
+.opt input{display:none}
+.obox{width:15px;height:15px;border:1px solid var(--b3);border-radius:4px;display:grid;place-items:center;flex-shrink:0;font-size:10px;color:transparent;transition:all .14s}
+.opt.active .obox{background:var(--accent);border-color:var(--accent);color:#fff}
+.olbl{font-size:13px;color:var(--text2);line-height:1.3}
+.opt.active .olbl{color:var(--text)}
+
+/* ── FORM ── */
+select,input[type="number"],input[type="text"]{background:var(--s2);border:1px solid var(--b2);border-radius:var(--r);color:var(--text);font-family:var(--sans);font-size:13px;padding:8px 12px;outline:none;width:100%;transition:border-color .14s;-webkit-appearance:none}
+select:focus,input:focus{border-color:var(--accent)}
+select option{background:var(--s2)}
+.frow{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:14px}
+.flbl{display:block;font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--text3);margin-bottom:6px}
+.tcfg{margin-top:16px;border-top:1px solid var(--b1);padding-top:16px}
+.tcfg-title{font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--text3);margin-bottom:12px}
+
+/* ── COLUMN MANAGER ── */
+.col-manager{display:flex;flex-direction:column;gap:6px}
+.col-item{display:flex;align-items:center;gap:10px;padding:9px 12px;background:var(--s2);border:1px solid var(--b1);border-radius:var(--r);font-size:13px}
+.col-item input[type="checkbox"]{width:14px;height:14px;accent-color:var(--accent);flex-shrink:0;cursor:pointer}
+.col-name{font-family:var(--mono);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text)}
+.col-type-badge{font-family:var(--mono);font-size:10px;padding:2px 7px;border-radius:4px}
+.col-null{font-size:11px;color:var(--text3);font-family:var(--mono);white-space:nowrap}
+.col-empty{color:var(--text3);font-size:13px;padding:12px 0}
+
+/* ── RUN BUTTON ── */
+.run-btn{width:100%;padding:15px;background:var(--accent);color:#fff;border:none;border-radius:var(--r);font-family:var(--sans);font-size:14px;font-weight:600;cursor:pointer;margin-top:22px;letter-spacing:.01em;display:flex;align-items:center;justify-content:center;gap:10px;transition:background .16s,transform .12s}
+.run-btn:hover:not(:disabled){background:var(--accent-d);transform:translateY(-1px)}
+.run-btn:disabled{opacity:.4;cursor:not-allowed;transform:none}
+.spin{display:none;width:16px;height:16px;border:2px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:rot .65s linear infinite}
+@keyframes rot{to{transform:rotate(360deg)}}
+
+/* ── RESULTS ── */
+.results{display:none;margin-top:36px}
+.results.on{display:block}
+.rtabs{display:flex;gap:2px;border-bottom:1px solid var(--b1);margin-bottom:20px;overflow-x:auto}
+.rtab{padding:8px 15px;font-size:13px;font-weight:500;color:var(--text3);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;transition:color .14s;display:flex;align-items:center;gap:7px;white-space:nowrap}
+.rtab:hover{color:var(--text2)}
+.rtab.on{color:var(--accent);border-bottom-color:var(--accent)}
+.rtab i{font-size:14px}
+.rpane{display:none}
+.rpane.on{display:block}
+
+/* ── STAT CARDS ── */
+.stat-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:10px;margin-bottom:20px}
+.stat-card{background:var(--s1);border:1px solid var(--b1);border-radius:var(--r);padding:14px}
+.stat-col{font-family:var(--mono);font-size:11px;color:var(--accent);margin-bottom:10px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.srow{display:flex;justify-content:space-between;align-items:center;padding:4px 0;border-bottom:1px solid var(--b1);font-size:12px}
+.srow:last-child{border-bottom:none}
+.srow-k{color:var(--text2)}
+.srow-v{font-family:var(--mono);color:var(--text);font-weight:500}
+
+/* ── ISSUES ── */
+.issues{display:flex;flex-direction:column;gap:8px}
+.issue{display:flex;align-items:flex-start;gap:12px;padding:12px 14px;background:var(--s1);border:1px solid var(--b1);border-radius:var(--r);font-size:13px}
+.idot{width:7px;height:7px;border-radius:50%;margin-top:5px;flex-shrink:0}
+.idot-r{background:var(--red)}.idot-y{background:var(--amber)}.idot-g{background:var(--green)}
+.imsg{color:var(--text2);line-height:1.5}
+.imsg strong{color:var(--text)}
+
+/* ── LOG ── */
+.log-box{background:var(--s1);border:1px solid var(--b1);border-radius:var(--r);padding:14px;font-family:var(--mono);font-size:12px;line-height:1.9;color:var(--text2);max-height:320px;overflow-y:auto}
+.ll{display:flex;gap:12px}
+.lts{color:var(--text4);flex-shrink:0}
+.lok{color:var(--green)}.lwarn{color:var(--amber)}.linfo{color:var(--accent)}
+
+/* ── DOWNLOAD ── */
+.dl-row{display:flex;gap:10px;margin-top:20px;flex-wrap:wrap}
+.dl-btn{display:inline-flex;align-items:center;gap:8px;padding:9px 18px;border-radius:var(--r);font-size:13px;font-weight:500;cursor:pointer;text-decoration:none;transition:opacity .14s,transform .12s;border:none}
+.dl-btn:hover:not(:disabled){opacity:.82;transform:translateY(-1px)}
+.dl-btn:disabled{opacity:.35;cursor:not-allowed}
+.dl-csv{background:var(--green);color:#052e16}
+.dl-report{background:var(--s2);color:var(--text);border:1px solid var(--b2)}
+
+/* ── CORR ── */
+.corr-table th,.corr-table td{font-size:11px;padding:5px 9px;text-align:center}
+.ch{background:rgba(59,130,246,.3)!important}.cm{background:rgba(59,130,246,.14)!important}.cn{background:rgba(239,68,68,.18)!important}
+
+/* ── EMPTY / ERR ── */
+.empty{text-align:center;padding:44px 20px;color:var(--text3);font-size:13px}
+.empty-icon{font-size:28px;color:var(--text4);margin-bottom:12px}
+.err-banner{background:var(--red-t);border:1px solid var(--red);border-radius:var(--r);padding:13px 16px;font-size:13px;color:var(--red);display:flex;align-items:flex-start;gap:10px;margin-bottom:16px}
+.err-banner.hidden{display:none}
+
+/* ── TOAST ── */
+.toast{position:fixed;bottom:22px;right:22px;background:var(--s2);border:1px solid var(--b2);border-radius:var(--r);padding:11px 16px;font-size:13px;color:var(--text);box-shadow:0 8px 32px rgba(0,0,0,.5);z-index:999;transform:translateY(70px);opacity:0;transition:transform .28s,opacity .28s;max-width:300px;display:flex;align-items:center;gap:10px}
+.toast.on{transform:translateY(0);opacity:1}
+.tdot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+
+@media(max-width:640px){.frow{grid-template-columns:1fr}.dl-row{flex-direction:column}.header{flex-direction:column;align-items:flex-start;gap:10px}.opt-grid{grid-template-columns:1fr}.quality-wrap.on{flex-direction:column}.quality-breakdown{grid-template-columns:1fr}}
+::-webkit-scrollbar{width:5px;height:5px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--b2);border-radius:3px}
+</style>
+</head>
+<body>
+<div class="page">
+
+<!-- HEADER -->
+<header class="header">
+  <div class="brand">
+    <div class="brand-mark">
+      <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <rect x="2" y="5" width="5" height="8" rx="1.5" fill="white" opacity="0.9"/>
+        <rect x="9" y="2" width="5" height="14" rx="1.5" fill="white"/>
+        <rect x="2" y="14.5" width="5" height="1.5" rx=".75" fill="white" opacity="0.4"/>
+      </svg>
+    </div>
+    <div class="brand-text">
+      <div class="brand-name">Veri<em>flow</em></div>
+      <div class="brand-sub">Data pipeline &amp; transformation</div>
+    </div>
+  </div>
+  <div class="header-right">
+    <div class="header-status">
+      <div class="health-dot" id="healthDot" title="Server status"></div>
+      <span id="healthLabel">Connecting</span>
+    </div>
+    <div class="header-divider"></div>
+    <div class="header-version">v2.1</div>
+  </div>
+</header>
+
+<!-- ERROR BANNER -->
+<div class="err-banner hidden" id="errBanner">
+  <i class="ti ti-alert-circle" style="font-size:16px;flex-shrink:0;margin-top:1px"></i>
+  <span id="errMsg"></span>
+</div>
+
+<!-- UPLOAD -->
+<div class="upload-zone" id="uploadZone">
+  <input type="file" id="fileInput" accept=".csv,.tsv,.txt"/>
+  <div class="uz-icon" id="uzIcon"><i class="ti ti-upload"></i></div>
+  <div class="uz-title" id="uzTitle">Drop a file here, or click to select</div>
+  <div class="uz-sub" id="uzSub">Accepts <span>.csv</span> and <span>.tsv</span> — delimiter auto-detected, up to 100 MB</div>
+</div>
+
+<!-- PROGRESS -->
+<div class="prog-wrap" id="progWrap">
+  <div class="prog-top"><span id="progLabel">Uploading…</span><span id="progPct">0%</span></div>
+  <div class="prog-bar"><div class="prog-fill" id="progFill"></div></div>
+</div>
+
+<!-- QUALITY SCORE -->
+<div class="quality-wrap" id="qualityWrap">
+  <div class="quality-score">
+    <div class="qs-ring">
+      <svg width="56" height="56" viewBox="0 0 56 56">
+        <circle class="qs-track" cx="28" cy="28" r="23"/>
+        <circle class="qs-fill" id="qsCircle" cx="28" cy="28" r="23" stroke-dasharray="144.51" stroke-dashoffset="144.51"/>
+      </svg>
+      <div class="qs-num" id="qsNum">—</div>
+    </div>
+    <div class="qs-info">
+      <div class="qs-label" id="qsLabel">Quality score</div>
+      <div class="qs-sub" id="qsSub">Upload a file to compute data quality</div>
+    </div>
+  </div>
+  <div class="quality-breakdown" id="qsBreakdown">
+    <div class="qb-item"><span class="qb-label">Completeness</span><span class="qb-val" id="qbComplete">—</span></div>
+    <div class="qb-item"><span class="qb-label">Uniqueness</span><span class="qb-val" id="qbUnique">—</span></div>
+    <div class="qb-item"><span class="qb-label">Null columns</span><span class="qb-val" id="qbNullCols">—</span></div>
+    <div class="qb-item"><span class="qb-label">Numeric cols</span><span class="qb-val" id="qbNumeric">—</span></div>
+    <div class="qb-item"><span class="qb-label">Text cols</span><span class="qb-val" id="qbText">—</span></div>
+    <div class="qb-item"><span class="qb-label">Other cols</span><span class="qb-val" id="qbOther">—</span></div>
+  </div>
+</div>
+
+<!-- META CARDS -->
+<div class="meta-grid" id="metaGrid">
+  <div class="meta-card"><div class="meta-lbl">Filename</div><div class="meta-val" id="mName">—</div></div>
+  <div class="meta-card"><div class="meta-lbl">Size</div><div class="meta-val" id="mSize">—</div></div>
+  <div class="meta-card"><div class="meta-lbl">Rows</div><div class="meta-val" id="mRows">—</div></div>
+  <div class="meta-card"><div class="meta-lbl">Columns</div><div class="meta-val" id="mCols">—</div></div>
+  <div class="meta-card"><div class="meta-lbl">Null cells</div><div class="meta-val" id="mNulls">—</div></div>
+  <div class="meta-card"><div class="meta-lbl">Status</div><div class="meta-val" id="mStatus" style="color:var(--amber)">Analysing…</div></div>
+</div>
+
+<!-- DATA PREVIEW -->
+<div class="preview" id="previewSection">
+  <div class="slabel">File preview — first 10 rows</div>
+  <div class="tscroll" id="previewTable"></div>
+</div>
+
+<!-- SCHEMA PANEL -->
+<div class="schema-section" id="schemaSection">
+  <div class="slabel">Column schema inference</div>
+  <div class="schema-grid" id="schemaGrid"></div>
+</div>
+
+<!-- PIPELINE -->
+<div class="pipeline" id="pipeline">
+  <div class="slabel" style="margin-top:10px">Pipeline configuration</div>
+
+  <!-- VALIDATE -->
+  <div class="panel">
+    <div class="phdr open" onclick="togglePanel(this)">
+      <div class="ptitle"><div class="pbadge pb-blue"><i class="ti ti-shield-check"></i></div>Validate</div>
+      <i class="ti ti-chevron-down pchev"></i>
+    </div>
+    <div class="pbody open">
+      <div class="opt-grid">
+        <label class="opt active"><input type="checkbox" id="vNull" checked/><div class="obox">✓</div><span class="olbl">Detect null / empty cells</span></label>
+        <label class="opt active"><input type="checkbox" id="vDup" checked/><div class="obox">✓</div><span class="olbl">Find duplicate rows</span></label>
+        <label class="opt"><input type="checkbox" id="vType"/><div class="obox"></div><span class="olbl">Check column types</span></label>
+        <label class="opt"><input type="checkbox" id="vEmail"/><div class="obox"></div><span class="olbl">Validate email addresses</span></label>
+        <label class="opt"><input type="checkbox" id="vPhone"/><div class="obox"></div><span class="olbl">Validate phone numbers</span></label>
+        <label class="opt"><input type="checkbox" id="vRange"/><div class="obox"></div><span class="olbl">Detect numeric outliers (IQR)</span></label>
+      </div>
+    </div>
+  </div>
+
+  <!-- CLEAN -->
+  <div class="panel">
+    <div class="phdr open" onclick="togglePanel(this)">
+      <div class="ptitle"><div class="pbadge pb-green"><i class="ti ti-sparkles"></i></div>Clean</div>
+      <i class="ti ti-chevron-down pchev"></i>
+    </div>
+    <div class="pbody open">
+      <div class="opt-grid">
+        <label class="opt active"><input type="checkbox" id="cTrim" checked/><div class="obox">✓</div><span class="olbl">Trim whitespace</span></label>
+        <label class="opt"><input type="checkbox" id="cDedupe"/><div class="obox"></div><span class="olbl">Remove duplicate rows</span></label>
+        <label class="opt"><input type="checkbox" id="cFillMean"/><div class="obox"></div><span class="olbl">Fill nulls with column mean</span></label>
+        <label class="opt"><input type="checkbox" id="cFillMode"/><div class="obox"></div><span class="olbl">Fill text nulls with mode</span></label>
+        <label class="opt"><input type="checkbox" id="cDropNull"/><div class="obox"></div><span class="olbl">Drop fully null rows</span></label>
+        <label class="opt"><input type="checkbox" id="cNormHdr"/><div class="obox"></div><span class="olbl">Normalize header names</span></label>
+        <label class="opt"><input type="checkbox" id="cLower"/><div class="obox"></div><span class="olbl">Lowercase text columns</span></label>
+        <label class="opt"><input type="checkbox" id="cSpecial"/><div class="obox"></div><span class="olbl">Strip special characters</span></label>
+      </div>
+    </div>
+  </div>
+
+  <!-- TRANSFORM -->
+  <div class="panel">
+    <div class="phdr open" onclick="togglePanel(this)">
+      <div class="ptitle"><div class="pbadge pb-purple"><i class="ti ti-math-function"></i></div>Transform</div>
+      <i class="ti ti-chevron-down pchev"></i>
+    </div>
+    <div class="pbody open">
+      <div class="opt-grid">
+        <label class="opt"><input type="checkbox" id="tZscore"/><div class="obox"></div><span class="olbl">Z-Score normalization</span></label>
+        <label class="opt"><input type="checkbox" id="tMinMax"/><div class="obox"></div><span class="olbl">Min-Max scaling [0,1]</span></label>
+        <label class="opt"><input type="checkbox" id="tLog"/><div class="obox"></div><span class="olbl">Log transformation (ln)</span></label>
+        <label class="opt"><input type="checkbox" id="tSqrt"/><div class="obox"></div><span class="olbl">Square root transform</span></label>
+        <label class="opt"><input type="checkbox" id="tOneHot"/><div class="obox"></div><span class="olbl">One-hot encode categoricals</span></label>
+        <label class="opt"><input type="checkbox" id="tLabel"/><div class="obox"></div><span class="olbl">Label encode categoricals</span></label>
+        <label class="opt"><input type="checkbox" id="tFreq"/><div class="obox"></div><span class="olbl">Frequency encode categoricals</span></label>
+        <label class="opt"><input type="checkbox" id="tBin"/><div class="obox"></div><span class="olbl">Bin numeric columns</span></label>
+      </div>
+      <div class="tcfg">
+        <div class="tcfg-title">Column selection</div>
+        <div class="frow">
+          <div><label class="flbl">Numeric columns</label><select id="numColSel" multiple size="5"></select></div>
+          <div><label class="flbl">Categorical columns</label><select id="catColSel" multiple size="5"></select></div>
+        </div>
+        <div class="frow" style="margin-top:10px">
+          <div><label class="flbl">Bin count</label><input type="number" id="binCount" value="5" min="2" max="50"/></div>
+          <div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- STATISTICS -->
+  <div class="panel">
+    <div class="phdr open" onclick="togglePanel(this)">
+      <div class="ptitle"><div class="pbadge pb-amber"><i class="ti ti-chart-bar"></i></div>Statistics</div>
+      <i class="ti ti-chevron-down pchev"></i>
+    </div>
+    <div class="pbody open">
+      <div class="opt-grid">
+        <label class="opt active"><input type="checkbox" id="sMean" checked/><div class="obox">✓</div><span class="olbl">Mean</span></label>
+        <label class="opt active"><input type="checkbox" id="sMedian" checked/><div class="obox">✓</div><span class="olbl">Median</span></label>
+        <label class="opt active"><input type="checkbox" id="sStd" checked/><div class="obox">✓</div><span class="olbl">Standard deviation</span></label>
+        <label class="opt"><input type="checkbox" id="sVar"/><div class="obox"></div><span class="olbl">Variance</span></label>
+        <label class="opt active"><input type="checkbox" id="sMinMax" checked/><div class="obox">✓</div><span class="olbl">Min / Max</span></label>
+        <label class="opt"><input type="checkbox" id="sCorr"/><div class="obox"></div><span class="olbl">Correlation matrix</span></label>
+        <label class="opt"><input type="checkbox" id="sSkew"/><div class="obox"></div><span class="olbl">Skewness</span></label>
+        <label class="opt active"><input type="checkbox" id="sCount" checked/><div class="obox">✓</div><span class="olbl">Null count</span></label>
+      </div>
+    </div>
+  </div>
+
+  <!-- COLUMN MANAGER -->
+  <div class="panel">
+    <div class="phdr" onclick="togglePanel(this)">
+      <div class="ptitle"><div class="pbadge pb-red"><i class="ti ti-columns"></i></div>Column manager <span style="font-size:12px;color:var(--text3);font-weight:400;margin-left:6px">— select output columns</span></div>
+      <i class="ti ti-chevron-down pchev"></i>
+    </div>
+    <div class="pbody">
+      <div style="display:flex;gap:8px;margin-bottom:12px">
+        <button onclick="toggleAllCols(true)"  style="background:var(--s2);border:1px solid var(--b2);color:var(--text2);font-size:12px;padding:5px 12px;border-radius:var(--r);cursor:pointer">Select all</button>
+        <button onclick="toggleAllCols(false)" style="background:var(--s2);border:1px solid var(--b2);color:var(--text2);font-size:12px;padding:5px 12px;border-radius:var(--r);cursor:pointer">Deselect all</button>
+      </div>
+      <div class="col-manager" id="colManager"><div class="col-empty">Select a file to populate the column list.</div></div>
+    </div>
+  </div>
+
+  <!-- RUN -->
+  <button class="run-btn" id="runBtn" onclick="runPipeline()">
+    <div class="spin" id="spin"></div>
+    <i class="ti ti-player-play" id="runIcon"></i>
+    <span id="runTxt">Execute pipeline</span>
+  </button>
+</div>
+
+<!-- RESULTS -->
+<div class="results" id="results">
+  <div class="slabel">Results</div>
+  <div class="rtabs">
+    <div class="rtab on"  onclick="switchTab(this,'pValidation')"><i class="ti ti-shield-check"></i>Validation</div>
+    <div class="rtab" onclick="switchTab(this,'pStats')"><i class="ti ti-chart-bar"></i>Statistics</div>
+    <div class="rtab" onclick="switchTab(this,'pSchema')"><i class="ti ti-list-details"></i>Output column profiles</div>
+    <div class="rtab" onclick="switchTab(this,'pTransformed')"><i class="ti ti-table"></i>Transformed output</div>
+    <div class="rtab" onclick="switchTab(this,'pLog')"><i class="ti ti-terminal"></i>Log</div>
+  </div>
+
+  <div class="rpane on" id="pValidation">
+    <div class="issues" id="issueList"><div class="empty"><div class="empty-icon"><i class="ti ti-shield"></i></div>Run the pipeline to see validation results.</div></div>
+  </div>
+  <div class="rpane" id="pStats">
+    <div class="stat-grid" id="statGrid"><div class="empty"><div class="empty-icon"><i class="ti ti-chart-bar"></i></div>Run the pipeline to see statistics.</div></div>
+    <div id="corrWrap"></div>
+  </div>
+  <div class="rpane" id="pSchema">
+    <div id="resultSchemaGrid"><div class="empty"><div class="empty-icon"><i class="ti ti-list-details"></i></div>Run the pipeline to see column profiles.</div></div>
+  </div>
+  <div class="rpane" id="pTransformed">
+    <div id="transWrap"><div class="empty"><div class="empty-icon"><i class="ti ti-table"></i></div>Run the pipeline to see transformed data.</div></div>
+  </div>
+  <div class="rpane" id="pLog">
+    <div class="log-box" id="logBox"></div>
+  </div>
+
+  <div class="dl-row">
+    <button class="dl-btn dl-csv"    id="dlCsv"    onclick="downloadCSV()"    disabled><i class="ti ti-download"></i>Export transformed CSV</button>
+    <button class="dl-btn dl-report" id="dlReport" onclick="downloadReport()" disabled><i class="ti ti-file-description"></i>Export audit report</button>
+  </div>
+</div>
+
+</div><!-- /page -->
+<div class="toast" id="toast"><div class="tdot" id="tdot"></div><span id="tmsg"></span></div>
+
+<script>
+/* ════════════════════════════════════════════════
+   CONFIG — point to your server
+════════════════════════════════════════════════ */
+const API_BASE = '';   // '' = same origin (served by Node); or 'http://localhost:3001'
+
+/* ════════════════════════════════════════════════
+   STATE
+════════════════════════════════════════════════ */
+let currentFile   = null;
+let schemaData    = null;   // from /api/schema
+let downloadToken = null;
+let lastResult    = null;
+
+/* ════════════════════════════════════════════════
+   INIT
+════════════════════════════════════════════════ */
+checkHealth();
+setInterval(checkHealth, 30_000);
+
+async function checkHealth() {
+  try {
+    const r = await fetch(`${API_BASE}/api/health`, { signal: AbortSignal.timeout(4000) });
+    const ok = r.ok;
+    document.getElementById('healthDot').className   = ok ? 'health-dot ok' : 'health-dot err';
+    document.getElementById('healthLabel').textContent = ok ? 'Online' : 'Degraded';
+  } catch {
+    document.getElementById('healthDot').className   = 'health-dot err';
+    document.getElementById('healthLabel').textContent = 'Offline';
+  }
+}
+
+/* ════════════════════════════════════════════════
+   CHECKBOX SYNC
+════════════════════════════════════════════════ */
+document.querySelectorAll('.opt').forEach(el => {
+  const cb  = el.querySelector('input[type="checkbox"]');
+  const box = el.querySelector('.obox');
+  cb.addEventListener('change', () => {
+    el.classList.toggle('active', cb.checked);
+    box.textContent = cb.checked ? '✓' : '';
+  });
+});
+
+/* ════════════════════════════════════════════════
+   PANELS
+════════════════════════════════════════════════ */
+function togglePanel(hdr) {
+  hdr.classList.toggle('open');
+  hdr.nextElementSibling.classList.toggle('open');
+}
+
+/* ════════════════════════════════════════════════
+   DRAG & DROP
+════════════════════════════════════════════════ */
+const zone = document.getElementById('uploadZone');
+zone.addEventListener('dragover',  e => { e.preventDefault(); zone.classList.add('drag'); });
+zone.addEventListener('dragleave', ()  => zone.classList.remove('drag'));
+zone.addEventListener('drop', e => { e.preventDefault(); zone.classList.remove('drag'); const f = e.dataTransfer.files[0]; if (f) handleFile(f); });
+document.getElementById('fileInput').addEventListener('change', function() { if (this.files[0]) handleFile(this.files[0]); });
+
+/* ════════════════════════════════════════════════
+   FILE LOAD — sends to /api/schema for instant profiling
+════════════════════════════════════════════════ */
+async function handleFile(file) {
+  currentFile   = file;
+  downloadToken = null;
+  lastResult    = null;
+  schemaData    = null;
+  hideError();
+
+  // Update upload zone
+  zone.classList.add('loaded');
+  document.getElementById('uzIcon').innerHTML = '<i class="ti ti-circle-check"></i>';
+  document.getElementById('uzTitle').textContent = file.name;
+  document.getElementById('uzSub').textContent   = 'Replace file by dropping another here';
+
+  // Meta skeleton
+  document.getElementById('mName').textContent   = file.name;
+  document.getElementById('mSize').textContent   = fmtBytes(file.size);
+  document.getElementById('mRows').textContent   = '…';
+  document.getElementById('mCols').textContent   = '…';
+  document.getElementById('mNulls').textContent  = '…';
+  document.getElementById('mStatus').textContent = 'Analysing…';
+  document.getElementById('mStatus').style.color = 'var(--amber)';
+  document.getElementById('metaGrid').classList.add('on');
+  document.getElementById('qualityWrap').classList.add('on');
+
+  // Show progress
+  setProgress(0, 'Uploading for analysis…');
+  document.getElementById('progWrap').classList.add('on');
+
+  const fd = new FormData();
+  fd.append('file', file);
+
+  try {
+    const res = await uploadWithProgress(`${API_BASE}/api/schema`, fd, pct => setProgress(pct, 'Analysing schema…'));
+    if (!res.ok) throw new Error(res.error || 'Schema analysis failed');
+
+    schemaData = res.schema;
+
+    // Meta
+    const totalCells  = res.rows * res.columns;
+    const totalNulls  = schemaData.reduce((s, c) => s + c.nulls, 0);
+    document.getElementById('mRows').textContent   = res.rows.toLocaleString();
+    document.getElementById('mCols').textContent   = res.columns;
+    document.getElementById('mNulls').textContent  = totalNulls.toLocaleString();
+    document.getElementById('mStatus').textContent = 'Ready';
+    document.getElementById('mStatus').style.color = 'var(--green)';
+
+    // Quality score
+    renderQualityScore(schemaData, res.rows, totalCells, totalNulls);
+
+    // Quick local parse for preview only
+    const reader = new FileReader();
+    reader.onload = e => {
+      const { rows, headers } = quickParse(e.target.result);
+      renderTable(document.getElementById('previewTable'), rows.slice(0, 10), headers);
+      document.getElementById('previewSection').classList.add('on');
+    };
+    reader.readAsText(file, 'UTF-8');
+
+    // Schema panel
+    renderSchemaCards(schemaData, 'schemaGrid');
+    document.getElementById('schemaSection').classList.add('on');
+
+    // Populate pipeline column selects + column manager
+    populateColSelects(schemaData);
+    renderColManager(schemaData);
+    document.getElementById('pipeline').classList.add('on');
+    document.getElementById('results').classList.add('on');
+
+    showToast(`${res.rows.toLocaleString()} rows × ${res.columns} columns — schema ready`, 'green');
+  } catch (err) {
+    showError('Schema analysis failed: ' + err.message + ' — is the server running?');
+    showToast('Analysis failed', 'red');
+    // Still let them use the pipeline (fallback)
+    const reader = new FileReader();
+    reader.onload = e => {
+      const { rows, headers } = quickParse(e.target.result);
+      document.getElementById('mRows').textContent  = rows.length.toLocaleString();
+      document.getElementById('mCols').textContent  = headers.length;
+      document.getElementById('mStatus').textContent = 'Offline mode';
+      document.getElementById('mStatus').style.color = 'var(--amber)';
+      renderTable(document.getElementById('previewTable'), rows.slice(0, 10), headers);
+      document.getElementById('previewSection').classList.add('on');
+      populateColSelectsFallback(headers, rows);
+      renderColManagerFallback(headers);
+      document.getElementById('pipeline').classList.add('on');
+      document.getElementById('results').classList.add('on');
+    };
+    reader.readAsText(file, 'UTF-8');
+  } finally {
+    hideProgress();
+  }
+}
+
+/* ════════════════════════════════════════════════
+   QUALITY SCORE
+════════════════════════════════════════════════ */
+function renderQualityScore(schema, rows, totalCells, totalNulls) {
+  const completeness = totalCells > 0 ? ((totalCells - totalNulls) / totalCells) : 1;
+  const numericCols  = schema.filter(s => s.type === 'numeric').length;
+  const textCols     = schema.filter(s => s.type === 'text').length;
+  const otherCols    = schema.length - numericCols - textCols;
+  const nullCols     = schema.filter(s => s.nullPct > 50).length;
+  const score        = Math.round(completeness * 100);
+
+  const circumference = 144.51;
+  const offset = circumference - (score / 100) * circumference;
+  const circle = document.getElementById('qsCircle');
+  circle.style.strokeDashoffset = offset;
+  circle.style.stroke = score >= 80 ? 'var(--green)' : score >= 50 ? 'var(--amber)' : 'var(--red)';
+
+  document.getElementById('qsNum').textContent   = score + '%';
+  document.getElementById('qsLabel').textContent = score >= 80 ? 'High integrity' : score >= 50 ? 'Moderate integrity' : 'Low integrity';
+  document.getElementById('qsSub').textContent   = `${(completeness*100).toFixed(1)}% cells filled`;
+
+  document.getElementById('qbComplete').textContent  = (completeness * 100).toFixed(1) + '%';
+  document.getElementById('qbComplete').style.color  = completeness > 0.9 ? 'var(--green)' : completeness > 0.6 ? 'var(--amber)' : 'var(--red)';
+  document.getElementById('qbUnique').textContent    = schema.length > 0 ? ((schema.reduce((s,c) => s + c.cardinality, 0) / schema.length) * 100).toFixed(0) + '% avg' : '—';
+  document.getElementById('qbNullCols').textContent  = nullCols + (nullCols === 1 ? ' col' : ' cols');
+  document.getElementById('qbNullCols').style.color  = nullCols === 0 ? 'var(--green)' : 'var(--amber)';
+  document.getElementById('qbNumeric').textContent   = numericCols;
+  document.getElementById('qbText').textContent      = textCols;
+  document.getElementById('qbOther').textContent     = otherCols;
+}
+
+/* ════════════════════════════════════════════════
+   SCHEMA CARDS
+════════════════════════════════════════════════ */
+function renderSchemaCards(schema, containerId) {
+  const grid = document.getElementById(containerId);
+  if (!schema || !schema.length) { grid.innerHTML = '<div class="empty"><div class="empty-icon"><i class="ti ti-list-details"></i></div>No schema data.</div>'; return; }
+
+  grid.innerHTML = schema.map(col => {
+    const nullPct = col.nullPct || 0;
+    const fillCls = nullPct < 5 ? '' : nullPct < 30 ? 'warn' : 'bad';
+    const fillW   = Math.max(0, 100 - nullPct);
+    const typeClasses = { numeric:'type-numeric', text:'type-text', datetime:'type-datetime', boolean:'type-boolean', email:'type-email' };
+    const typeCls = typeClasses[col.type] || 'type-text';
+
+    let rows = '';
+    if (col.type === 'numeric') {
+      rows = `
+        <div class="sc-row"><span class="sc-row-k">min</span><span class="sc-row-v">${fmt(col.min)}</span></div>
+        <div class="sc-row"><span class="sc-row-k">max</span><span class="sc-row-v">${fmt(col.max)}</span></div>
+        <div class="sc-row"><span class="sc-row-k">mean</span><span class="sc-row-v">${fmt(col.mean)}</span></div>
+        <div class="sc-row"><span class="sc-row-k">std</span><span class="sc-row-v">${fmt(col.std)}</span></div>
+        <div class="sc-row"><span class="sc-row-k">p25</span><span class="sc-row-v">${fmt(col.p25)}</span></div>
+        <div class="sc-row"><span class="sc-row-k">p75</span><span class="sc-row-v">${fmt(col.p75)}</span></div>`;
+    } else {
+      rows = `<div class="sc-row"><span class="sc-row-k">unique</span><span class="sc-row-v">${col.unique?.toLocaleString() ?? '—'}</span></div>
+              <div class="sc-row"><span class="sc-row-k">cardinality</span><span class="sc-row-v">${((col.cardinality||0)*100).toFixed(0)}%</span></div>`;
+    }
+
+    let topHtml = '';
+    if (col.topValues && col.topValues.length) {
+      const maxCount = col.topValues[0].count;
+      topHtml = `<div class="sc-top"><div class="sc-top-title">Top values</div>` +
+        col.topValues.slice(0, 4).map(tv =>
+          `<div class="sc-top-item">
+            <span class="sc-top-lbl" title="${esc(tv.value)}">${esc(String(tv.value).slice(0,12))}</span>
+            <div class="sc-bar-wrap"><div class="sc-bar" style="width:${(tv.count/maxCount*100).toFixed(0)}%"></div></div>
+            <span class="sc-top-val">${tv.count}</span>
+          </div>`
+        ).join('') + `</div>`;
+    }
+
+    return `<div class="sc-card">
+      <div class="sc-head">
+        <span class="sc-name" title="${esc(col.column)}">${esc(col.column)}</span>
+        <span class="sc-type ${typeCls}">${col.type}</span>
+      </div>
+      <div class="sc-null-bar"><div class="sc-null-fill ${fillCls}" style="width:${fillW}%"></div></div>
+      <div class="sc-rows">
+        <div class="sc-row"><span class="sc-row-k">nulls</span><span class="sc-row-v" style="color:${nullPct>20?'var(--amber)':'inherit'}">${col.nulls} (${nullPct}%)</span></div>
+        ${rows}
+      </div>
+      ${topHtml}
+    </div>`;
+  }).join('');
+}
+
+/* ════════════════════════════════════════════════
+   COLUMN MANAGER
+════════════════════════════════════════════════ */
+function renderColManager(schema) {
+  const typeClasses = { numeric:'type-numeric', text:'type-text', datetime:'type-datetime', boolean:'type-boolean', email:'type-email' };
+  document.getElementById('colManager').innerHTML = schema.map((col, i) =>
+    `<div class="col-item">
+      <input type="checkbox" id="colinc_${i}" checked title="Include column"/>
+      <span class="col-name" title="${esc(col.column)}">${esc(col.column)}</span>
+      <span class="col-type-badge ${typeClasses[col.type]||'type-text'}">${col.type}</span>
+      <span class="col-null">${col.nullPct}% null</span>
+    </div>`
+  ).join('');
+}
+
+function renderColManagerFallback(headers) {
+  document.getElementById('colManager').innerHTML = headers.map((h, i) =>
+    `<div class="col-item">
+      <input type="checkbox" id="colinc_${i}" checked/>
+      <span class="col-name" title="${esc(h)}">${esc(h)}</span>
+      <span class="col-type-badge type-text">text</span>
+      <span class="col-null">—</span>
+    </div>`
+  ).join('');
+}
+
+function toggleAllCols(state) {
+  document.querySelectorAll('[id^="colinc_"]').forEach(cb => { cb.checked = state; });
+}
+
+function getIncludedCols() {
+  const items = document.querySelectorAll('.col-item');
+  const result = [];
+  items.forEach((item, i) => {
+    const cb = item.querySelector('input[type="checkbox"]');
+    const name = item.querySelector('.col-name').title;
+    if (cb && cb.checked) result.push(name);
+  });
+  return result;
+}
+
+/* ════════════════════════════════════════════════
+   COLUMN SELECTS
+════════════════════════════════════════════════ */
+function populateColSelects(schema) {
+  const ns = document.getElementById('numColSel');
+  const cs = document.getElementById('catColSel');
+  ns.innerHTML = ''; cs.innerHTML = '';
+  schema.forEach(col => {
+    const opt = `<option value="${esc(col.column)}" selected>${esc(col.column)}</option>`;
+    if (col.type === 'numeric') ns.innerHTML += opt; else cs.innerHTML += opt;
+  });
+}
+
+function populateColSelectsFallback(headers, data) {
+  const ns = document.getElementById('numColSel');
+  const cs = document.getElementById('catColSel');
+  ns.innerHTML = ''; cs.innerHTML = '';
+  headers.forEach(h => {
+    const vals  = data.map(r => r[h]).filter(v => v !== '' && v != null);
+    const isNum = vals.length > 0 && vals.every(v => !isNaN(Number(v)));
+    const opt   = `<option value="${esc(h)}" selected>${esc(h)}</option>`;
+    if (isNum) ns.innerHTML += opt; else cs.innerHTML += opt;
+  });
+}
+
+function getSel(id) { return [...document.getElementById(id).selectedOptions].map(o => o.value); }
+
+/* ════════════════════════════════════════════════
+   QUICK LOCAL PARSE (preview only)
+════════════════════════════════════════════════ */
+function quickParse(text) {
+  text = text.replace(/\r\n/g,'\n').replace(/\r/g,'\n').trimEnd();
+  const delim = detectDelim(text);
+  let col='',row=[],inQ=false,i=0;
+  const rows_raw=[];
+  while(i<=text.length){
+    const ch=i<text.length?text[i]:'\n';
+    if(inQ){if(ch==='"'){if(text[i+1]==='"'){col+='"';i++;}else inQ=false;}else col+=ch;}
+    else{if(ch==='"')inQ=true;else if(ch===delim){row.push(col);col='';}else if(ch==='\n'){row.push(col);col='';if(row.some(c=>c.trim()!==''))rows_raw.push(row);row=[];if(rows_raw.length>201)break;}else col+=ch;}
+    i++;
+  }
+  if(!rows_raw.length)return{rows:[],headers:[]};
+  const headers=rows_raw[0].map(h=>h.trim());
+  const rows=rows_raw.slice(1,201).map(r=>{const o={};headers.forEach((h,i)=>{o[h]=r[i]!==undefined?r[i]:''});return o;});
+  return{rows,headers};
+}
+
+function detectDelim(text){
+  const s=text.slice(0,4096);
+  const opts={',':(s.match(/,/g)||[]).length,'\t':(s.match(/\t/g)||[]).length,';':(s.match(/;/g)||[]).length,'|':(s.match(/\|/g)||[]).length};
+  return Object.entries(opts).sort((a,b)=>b[1]-a[1])[0][0];
+}
+
+/* ════════════════════════════════════════════════
+   RUN PIPELINE
+════════════════════════════════════════════════ */
+async function runPipeline() {
+  if (!currentFile) { showToast('Load a file first', 'red'); return; }
+
+  const btn=document.getElementById('runBtn'),spin=document.getElementById('spin'),runIcon=document.getElementById('runIcon'),runTxt=document.getElementById('runTxt');
+  btn.disabled=true; spin.style.display='block'; runIcon.style.display='none'; runTxt.textContent='Processing…';
+  hideError();
+  downloadToken=null;
+  document.getElementById('dlCsv').disabled=true;
+  document.getElementById('dlReport').disabled=true;
+
+  const includedCols = getIncludedCols();
+
+  const config = {
+    vNull:cb('vNull'),vDup:cb('vDup'),vType:cb('vType'),vEmail:cb('vEmail'),vPhone:cb('vPhone'),vRange:cb('vRange'),
+    cTrim:cb('cTrim'),cDedupe:cb('cDedupe'),cFillMean:cb('cFillMean'),cFillMode:cb('cFillMode'),cDropNull:cb('cDropNull'),cNormHdr:cb('cNormHdr'),cLower:cb('cLower'),cSpecial:cb('cSpecial'),
+    tZscore:cb('tZscore'),tMinMax:cb('tMinMax'),tLog:cb('tLog'),tSqrt:cb('tSqrt'),tOneHot:cb('tOneHot'),tLabel:cb('tLabel'),tFreq:cb('tFreq'),tBin:cb('tBin'),
+    numCols:getSel('numColSel'), catCols:getSel('catColSel'), binCount:parseInt(document.getElementById('binCount').value)||5,
+    sMean:cb('sMean'),sMedian:cb('sMedian'),sStd:cb('sStd'),sVar:cb('sVar'),sMinMax:cb('sMinMax'),sCorr:cb('sCorr'),sSkew:cb('sSkew'),sCount:cb('sCount'),
+    includedCols,
+  };
+
+  const fd = new FormData();
+  fd.append('file',   currentFile);
+  fd.append('config', JSON.stringify(config));
+
+  try {
+    const result = await uploadWithProgress(`${API_BASE}/api/process`, fd, pct => setProgress(pct, 'Uploading…'));
+    if (!result.ok) throw new Error(result.error || 'Degraded');
+
+    lastResult    = result;
+    downloadToken = result.downloadToken;
+
+    renderValidation(result.validation);
+    renderStats(result.statistics, result.corrMatrix);
+    renderSchemaCards(result.schema, 'resultSchemaGrid');
+    renderTransformed(result.preview, result.columns, result.transformedRows);
+    renderLogBox(result.log);
+
+    document.getElementById('dlCsv').disabled    = false;
+    document.getElementById('dlReport').disabled = false;
+    document.getElementById('mRows').textContent = result.transformedRows.toLocaleString();
+    document.getElementById('mCols').textContent = result.columns.length;
+    document.getElementById('mStatus').textContent = 'Done';
+    document.getElementById('mStatus').style.color  = 'var(--green)';
+
+    if (result.schema) {
+      const totalCells = result.transformedRows * result.schema.length;
+      const totalNulls = result.schema.reduce((s,c)=>s+c.nulls,0);
+      renderQualityScore(result.schema, result.transformedRows, totalCells, totalNulls);
+    }
+
+    showToast('Pipeline complete', 'green');
+    document.getElementById('results').scrollIntoView({ behavior:'smooth' });
+
+  } catch (err) {
+    showError(err.message || 'Pipeline failed. Is the server running?');
+    showToast('Pipeline failed', 'red');
+  } finally {
+    btn.disabled=false; spin.style.display='none'; runIcon.style.display=''; runTxt.textContent='Execute pipeline';
+    hideProgress();
+  }
+}
+
+/* ════════════════════════════════════════════════
+   XHR UPLOAD WITH PROGRESS
+════════════════════════════════════════════════ */
+function uploadWithProgress(url, formData, onProgress) {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', url);
+    xhr.upload.addEventListener('progress', e => { if (e.lengthComputable) onProgress(Math.round((e.loaded/e.total)*85)); });
+    xhr.addEventListener('load', () => { try { resolve(JSON.parse(xhr.responseText)); } catch { reject(new Error('Invalid server response')); } });
+    xhr.addEventListener('error',   () => reject(new Error('Network error')));
+    xhr.addEventListener('timeout', () => reject(new Error('Request timed out')));
+    xhr.timeout = 5 * 60_000;
+    xhr.send(formData);
+    setProgress(0,'Uploading…');
+    document.getElementById('progWrap').classList.add('on');
+  });
+}
+
+function setProgress(pct, label) {
+  document.getElementById('progFill').style.width  = pct + '%';
+  document.getElementById('progPct').textContent   = pct + '%';
+  document.getElementById('progLabel').textContent = pct >= 100 ? 'Processing…' : label;
+}
+function hideProgress() { setTimeout(() => document.getElementById('progWrap').classList.remove('on'), 900); }
+
+/* ════════════════════════════════════════════════
+   RENDER RESULTS
+════════════════════════════════════════════════ */
+function renderValidation(issues) {
+  document.getElementById('issueList').innerHTML = (issues||[]).map(i =>
+    `<div class="issue"><div class="idot idot-${i.lvl}"></div><div class="imsg">${i.msg}</div></div>`
+  ).join('') || '<div class="empty"><div class="empty-icon"><i class="ti ti-shield"></i></div>No issues reported.</div>';
+}
+
+function renderStats(stats, corrMatrix) {
+  const entries = Object.entries(stats || {});
+  document.getElementById('statGrid').innerHTML = entries.length
+    ? entries.map(([col,s]) => `<div class="stat-card"><div class="stat-col">${esc(col)}</div>${Object.entries(s).map(([k,v])=>`<div class="srow"><span class="srow-k">${k}</span><span class="srow-v">${v}</span></div>`).join('')}</div>`).join('')
+    : '<div class="empty"><div class="empty-icon"><i class="ti ti-chart-bar"></i></div>No numeric columns found.</div>';
+
+  if (corrMatrix && corrMatrix.columns.length >= 2) {
+    const cols = corrMatrix.columns;
+    let h = '<div class="slabel" style="margin-top:22px">Correlation matrix</div><div class="tscroll"><table class="corr-table"><thead><tr><th></th>';
+    cols.forEach(c => { h += `<th title="${esc(c)}">${c.length>12?c.slice(0,12)+'…':esc(c)}</th>`; });
+    h += '</tr></thead><tbody>';
+    corrMatrix.matrix.forEach((row, i) => {
+      h += `<tr><th>${cols[i].length>12?cols[i].slice(0,12)+'…':esc(cols[i])}</th>`;
+      row.forEach((v,j) => {
+        const cls = i===j?'':Math.abs(v)>0.7?'ch':Math.abs(v)>0.4?'cm':v<-0.4?'cn':'';
+        h += `<td class="${cls}">${v.toFixed(2)}</td>`;
+      });
+      h += '</tr>';
+    });
+    h += '</tbody></table></div>';
+    document.getElementById('corrWrap').innerHTML = h;
+  } else {
+    document.getElementById('corrWrap').innerHTML = '';
+  }
+}
+
+function renderTransformed(preview, columns, totalRows) {
+  const wrap = document.getElementById('transWrap');
+  if (!preview || !preview.length) { wrap.innerHTML = '<div class="empty"><div class="empty-icon"><i class="ti ti-table"></i></div>No data returned.</div>'; return; }
+  const note = `<p style="font-size:12px;color:var(--text3);font-family:var(--mono);padding:0 0 10px">Displaying first ${preview.length} of ${totalRows.toLocaleString()} rows · ${columns.length} columns</p>`;
+  const tbl  = document.createElement('div'); tbl.className='tscroll';
+  renderTable(tbl, preview, columns);
+  wrap.innerHTML = note;
+  wrap.appendChild(tbl);
+}
+
+function renderLogBox(log) {
+  const box = document.getElementById('logBox');
+  box.innerHTML = (log||[]).map(l => `<div class="ll"><span class="lts">${l.ts}</span><span class="l${l.type}">${esc(l.msg)}</span></div>`).join('');
+  box.scrollTop = 9999;
+}
+
+/* ════════════════════════════════════════════════
+   TABLE RENDERER
+════════════════════════════════════════════════ */
+function renderTable(container, data, cols) {
+  if (!data || !data.length) { container.innerHTML='<div class="empty"><div class="empty-icon"><i class="ti ti-table-off"></i></div>No data</div>'; return; }
+  let h = '<table><thead><tr>';
+  cols.forEach(c => { h += `<th title="${esc(c)}">${esc(c)}</th>`; });
+  h += '</tr></thead><tbody>';
+  data.forEach(row => {
+    h += '<tr>';
+    cols.forEach(c => {
+      const v=row[c], empty=v===''||v==null, num=!empty&&!isNaN(Number(v))&&String(v).trim()!=='';
+      h += `<td class="${empty?'cn':num?'cm':''}" title="${empty?'empty':esc(String(v))}">${empty?'∅':esc(String(v))}</td>`;
+    });
+    h += '</tr>';
+  });
+  h += '</tbody></table>';
+  container.innerHTML = h;
+}
+
+/* ════════════════════════════════════════════════
+   TABS
+════════════════════════════════════════════════ */
+function switchTab(el, id) {
+  document.querySelectorAll('.rtab').forEach(t  => t.classList.remove('on'));
+  document.querySelectorAll('.rpane').forEach(p => p.classList.remove('on'));
+  el.classList.add('on');
+  document.getElementById(id).classList.add('on');
+}
+
+/* ════════════════════════════════════════════════
+   DOWNLOADS
+════════════════════════════════════════════════ */
+function downloadCSV()    { if (downloadToken) window.location.href = `${API_BASE}/api/download/${downloadToken}`; }
+function downloadReport() {
+  if (!lastResult) return;
+  const report = { file:currentFile?.name, generated:new Date().toISOString(), original_rows:lastResult.originalRows, transformed_rows:lastResult.transformedRows, columns:lastResult.columns, validation:lastResult.validation, statistics:lastResult.statistics, corrMatrix:lastResult.corrMatrix, schema:lastResult.schema, log:lastResult.log };
+  const a = document.createElement('a');
+  a.href     = URL.createObjectURL(new Blob([JSON.stringify(report,null,2)],{type:'application/json'}));
+  a.download = (currentFile?.name.replace(/\.[^.]+$/,'')||'data') + '_report.json';
+  a.click();
+}
+
+/* ════════════════════════════════════════════════
+   UTILS
+════════════════════════════════════════════════ */
+function cb(id)      { return document.getElementById(id)?.checked ?? false; }
+function esc(s)      { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function fmt(v)      { return v == null ? '—' : typeof v === 'number' ? v.toLocaleString(undefined,{maximumFractionDigits:4}) : v; }
+function fmtBytes(b) { if(b<1024)return b+' B';if(b<1048576)return(b/1024).toFixed(1)+' KB';return(b/1048576).toFixed(1)+' MB'; }
+
+function showToast(msg, color) {
+  const t=document.getElementById('toast'), colors={green:'var(--green)',red:'var(--red)',blue:'var(--accent)'};
+  document.getElementById('tdot').style.background = colors[color]||colors.blue;
+  document.getElementById('tmsg').textContent = msg;
+  t.classList.add('on'); clearTimeout(t._t); t._t=setTimeout(()=>t.classList.remove('on'),3200);
+}
+function showError(msg) { document.getElementById('errMsg').textContent=msg; document.getElementById('errBanner').classList.remove('hidden'); }
+function hideError()    { document.getElementById('errBanner').classList.add('hidden'); }
+</script>
+</body>
+</html>
