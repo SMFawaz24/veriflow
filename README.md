@@ -1,4 +1,4 @@
-# Veriflow — Data Pipeline
+# Veriflow - Data Pipeline
 
 A self-hosted CSV validation, cleaning, and transformation tool.
 
@@ -6,10 +6,10 @@ A self-hosted CSV validation, cleaning, and transformation tool.
 
 ## Stack
 
-- **Frontend** — single-page HTML, no build step
-- **Backend** — Node.js + Express
-- **Process manager** — PM2
-- **Reverse proxy** — Nginx + Let's Encrypt
+- **Frontend** - single-page HTML, no build step
+- **Backend** - Node.js + Express
+- **Process manager** - PM2
+- **Reverse proxy** - Nginx + Let's Encrypt
 
 ---
 
